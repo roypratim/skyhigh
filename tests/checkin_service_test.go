@@ -12,7 +12,7 @@ import (
 func TestStartCheckIn_Success(t *testing.T) {
 	db := newTestDB(t)
 	baggageSvc := services.NewBaggageService(db)
-	svc := services.NewCheckInService(db, baggageSvc)
+	svc := services.NewCheckInService(db, baggageSvc, nil)
 
 	flight := seedFlight(t, db)
 	p := seedPassenger(t, db, "checkin_ok@test.com")
@@ -27,7 +27,7 @@ func TestStartCheckIn_Success(t *testing.T) {
 func TestStartCheckIn_DuplicatePrevented(t *testing.T) {
 	db := newTestDB(t)
 	baggageSvc := services.NewBaggageService(db)
-	svc := services.NewCheckInService(db, baggageSvc)
+	svc := services.NewCheckInService(db, baggageSvc, nil)
 
 	flight := seedFlight(t, db)
 	p := seedPassenger(t, db, "checkin_dup@test.com")
@@ -43,7 +43,7 @@ func TestStartCheckIn_DuplicatePrevented(t *testing.T) {
 func TestCancelCheckIn(t *testing.T) {
 	db := newTestDB(t)
 	baggageSvc := services.NewBaggageService(db)
-	svc := services.NewCheckInService(db, baggageSvc)
+	svc := services.NewCheckInService(db, baggageSvc, nil)
 
 	flight := seedFlight(t, db)
 	p := seedPassenger(t, db, "cancel_ci@test.com")
@@ -61,7 +61,7 @@ func TestCancelCheckIn(t *testing.T) {
 func TestCancelCheckIn_AlreadyCancelled(t *testing.T) {
 	db := newTestDB(t)
 	baggageSvc := services.NewBaggageService(db)
-	svc := services.NewCheckInService(db, baggageSvc)
+	svc := services.NewCheckInService(db, baggageSvc, nil)
 
 	flight := seedFlight(t, db)
 	p := seedPassenger(t, db, "cancel_twice@test.com")
@@ -77,7 +77,7 @@ func TestCancelCheckIn_AlreadyCancelled(t *testing.T) {
 func TestCheckIn_PauseOnExcessBaggage(t *testing.T) {
 	db := newTestDB(t)
 	baggageSvc := services.NewBaggageService(db)
-	svc := services.NewCheckInService(db, baggageSvc)
+	svc := services.NewCheckInService(db, baggageSvc, nil)
 
 	flight := seedFlight(t, db)
 	p := seedPassenger(t, db, "excess_ci@test.com")
@@ -97,7 +97,7 @@ func TestCheckIn_PauseOnExcessBaggage(t *testing.T) {
 func TestCompleteCheckIn(t *testing.T) {
 	db := newTestDB(t)
 	baggageSvc := services.NewBaggageService(db)
-	svc := services.NewCheckInService(db, baggageSvc)
+	svc := services.NewCheckInService(db, baggageSvc, nil)
 
 	flight := seedFlight(t, db)
 	p := seedPassenger(t, db, "complete_ci@test.com")

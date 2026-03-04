@@ -10,16 +10,20 @@ import (
 
 // CheckInService manages the check-in lifecycle.
 type CheckInService struct {
-	db          *gorm.DB
-	baggageSvc  *BaggageService
+	db         *gorm.DB
+	baggageSvc *BaggageService
+	seatSvc    *SeatService
 }
 
 // NewCheckInService creates a CheckInService.
-func NewCheckInService(db *gorm.DB, baggageSvc *BaggageService) *CheckInService {
-	return &CheckInService{db: db, baggageSvc: baggageSvc}
+func NewCheckInService(db *gorm.DB, baggageSvc *BaggageService, seatSvc *SeatService) *CheckInService {
+	return &CheckInService{db: db, baggageSvc: baggageSvc, seatSvc: seatSvc}
 }
 
 // StartCheckIn creates a new check-in record in IN_PROGRESS state.
+// When seatID is provided it validates that the seat belongs to the flight, is HELD,
+// and is held by this passenger, then confirms it (HELD → CONFIRMED) before creating
+// the check-in row.
 func (s *CheckInService) StartCheckIn(passengerID, flightID uint, seatID *uint) (*models.CheckIn, error) {
 	// Prevent duplicate active check-ins for same passenger+flight
 	var existing models.CheckIn
@@ -32,6 +36,26 @@ func (s *CheckInService) StartCheckIn(passengerID, flightID uint, seatID *uint) 
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
+	}
+
+	if seatID != nil {
+		if s.seatSvc == nil {
+			return nil, errors.New("seat service unavailable: cannot validate seat")
+		}
+		// Validate that the seat belongs to the requested flight.
+		var seat models.Seat
+		if err := s.db.First(&seat, *seatID).Error; err != nil {
+			return nil, fmt.Errorf("seat not found: %w", err)
+		}
+		if seat.FlightID != flightID {
+			return nil, errors.New("seat does not belong to the specified flight")
+		}
+
+		// Confirm the seat (validates HELD state + passenger ownership via Redis,
+		// then transitions HELD → CONFIRMED with distributed lock).
+		if err := s.seatSvc.ConfirmSeat(*seatID, passengerID); err != nil {
+			return nil, fmt.Errorf("seat confirmation failed: %w", err)
+		}
 	}
 
 	ci := &models.CheckIn{
