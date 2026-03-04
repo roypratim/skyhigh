@@ -69,7 +69,7 @@ func main() {
 
 	// Protected routes (require authentication)
 	authGroup := v1.Group("")
-	authGroup.Use(middleware.AuthMiddleware())
+	authGroup.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 
 	// Flights
 	// Flight creation is considered an admin-level operation and is protected.
