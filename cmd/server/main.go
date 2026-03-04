@@ -67,30 +67,37 @@ func main() {
 
 	v1 := router.Group("/api/v1")
 
+	// Protected routes (require authentication)
+	authGroup := v1.Group("")
+	authGroup.Use(middleware.AuthMiddleware())
+
 	// Flights
-	v1.POST("/flights", flightH.CreateFlight)
+	// Flight creation is considered an admin-level operation and is protected.
+	authGroup.POST("/flights", flightH.CreateFlight)
+	// Public read access to flight details and seatmap (seatmap is rate-limited).
 	v1.GET("/flights/:id", flightH.GetFlight)
 	v1.GET("/flights/:id/seatmap", middleware.RateLimit(redisClient), flightH.GetSeatMap)
 
 	// Seats
-	v1.POST("/flights/:flightId/seats", seatH.AddSeats)
-	v1.POST("/seats/:id/hold", seatH.HoldSeat)
-	v1.POST("/seats/:id/confirm", seatH.ConfirmSeat)
+	// Seat creation is considered an admin-level operation and is protected.
+	authGroup.POST("/flights/:flightId/seats", seatH.AddSeats)
+	authGroup.POST("/seats/:id/hold", seatH.HoldSeat)
+	authGroup.POST("/seats/:id/confirm", seatH.ConfirmSeat)
 
 	// Check-in
-	v1.POST("/checkins", checkInH.StartCheckIn)
-	v1.GET("/checkins/:id", checkInH.GetCheckIn)
-	v1.DELETE("/checkins/:id", checkInH.CancelCheckIn)
+	authGroup.POST("/checkins", checkInH.StartCheckIn)
+	authGroup.GET("/checkins/:id", checkInH.GetCheckIn)
+	authGroup.DELETE("/checkins/:id", checkInH.CancelCheckIn)
 
 	// Baggage
-	v1.POST("/checkins/:id/baggage", baggageH.AddBaggage)
+	authGroup.POST("/checkins/:id/baggage", baggageH.AddBaggage)
 
 	// Payment
-	v1.POST("/checkins/:id/payment", paymentH.ProcessPayment)
+	authGroup.POST("/checkins/:id/payment", paymentH.ProcessPayment)
 
 	// Waitlist
-	v1.POST("/flights/:flightId/waitlist", waitlistH.JoinWaitlist)
-	v1.GET("/flights/:flightId/waitlist", waitlistH.GetWaitlist)
+	authGroup.POST("/flights/:flightId/waitlist", waitlistH.JoinWaitlist)
+	authGroup.GET("/flights/:flightId/waitlist", waitlistH.GetWaitlist)
 
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)
 	log.Printf("SkyHigh Core listening on %s", addr)
