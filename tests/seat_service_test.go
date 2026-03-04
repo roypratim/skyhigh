@@ -34,17 +34,6 @@ func newTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// newTestRedis returns a mock Redis client using a miniredis server.
-// If miniredis is not available we skip; tests that need Redis are marked.
-func newMockRedis(t *testing.T) *redis.Client {
-	t.Helper()
-	// Use a real Redis client pointed at an address that will fail gracefully in
-	// unit tests – operations are expected to succeed only in integration tests.
-	// For unit tests that don't actually call Redis we return a no-op client.
-	client := redis.NewClient(&redis.Options{Addr: "localhost:6399"})
-	return client
-}
-
 func seedFlight(t *testing.T, db *gorm.DB) models.Flight {
 	t.Helper()
 	f := models.Flight{FlightNumber: "UT001", Origin: "A", Destination: "B"}
