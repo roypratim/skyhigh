@@ -41,12 +41,15 @@ func (h *BaggageHandler) AddBaggage(c *gin.Context) {
 		return
 	}
 
-	resp := gin.H{
-		"baggage":          baggage,
-		"requires_payment": requiresPayment,
-	}
+	checkInStatus := "IN_PROGRESS"
 	if requiresPayment {
-		resp["message"] = "excess baggage fee applies – check-in paused until payment"
+		checkInStatus = "WAITING_PAYMENT"
 	}
-	c.JSON(http.StatusCreated, resp)
+
+	c.JSON(http.StatusOK, gin.H{
+		"baggage_id":      baggage.ID,
+		"weight_kg":       baggage.WeightKg,
+		"excess_fee":      baggage.ExcessFee,
+		"check_in_status": checkInStatus,
+	})
 }

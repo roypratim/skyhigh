@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -18,18 +19,41 @@ type Config struct {
 	JWTSecret  string
 }
 
-// Load reads configuration from environment variables with sensible defaults.
+// Load reads configuration from environment variables.
+// In non-development environments (APP_ENV != "development") DB_PASSWORD and
+// JWT_SECRET must be explicitly provided; the service will not start otherwise.
 func Load() *Config {
+	isDev := os.Getenv("APP_ENV") == "development"
+
+	dbPassword := os.Getenv("DB_PASSWORD")
+	jwtSecret := os.Getenv("JWT_SECRET")
+
+	if isDev {
+		if dbPassword == "" {
+			dbPassword = "skyhigh123"
+		}
+		if jwtSecret == "" {
+			jwtSecret = "skyhigh-secret-key"
+		}
+	} else {
+		if dbPassword == "" {
+			log.Fatal("DB_PASSWORD environment variable is required")
+		}
+		if jwtSecret == "" {
+			log.Fatal("JWT_SECRET environment variable is required")
+		}
+	}
+
 	return &Config{
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     getEnv("DB_PORT", "5432"),
 		DBUser:     getEnv("DB_USER", "skyhigh"),
-		DBPassword: getEnv("DB_PASSWORD", "skyhigh123"),
+		DBPassword: dbPassword,
 		DBName:     getEnv("DB_NAME", "skyhigh_db"),
 		RedisHost:  getEnv("REDIS_HOST", "localhost"),
 		RedisPort:  getEnv("REDIS_PORT", "6379"),
 		ServerPort: getEnv("SERVER_PORT", "8080"),
-		JWTSecret:  getEnv("JWT_SECRET", "skyhigh-secret-key"),
+		JWTSecret:  jwtSecret,
 	}
 }
 

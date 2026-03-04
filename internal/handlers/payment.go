@@ -27,10 +27,18 @@ func (h *PaymentHandler) ProcessPayment(c *gin.Context) {
 		return
 	}
 
-	payment, err := h.paymentSvc.ProcessPayment(uint(checkInID))
+	var req struct {
+		Amount float64 `json:"amount" binding:"required,gt=0"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err = h.paymentSvc.ProcessPayment(uint(checkInID), req.Amount)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"payment": payment, "message": "payment processed – check-in completed"})
+	c.JSON(http.StatusOK, gin.H{"message": "payment confirmed", "check_in_status": "IN_PROGRESS"})
 }

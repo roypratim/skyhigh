@@ -20,8 +20,9 @@ func NewPaymentService(db *gorm.DB, checkInSvc *CheckInService) *PaymentService 
 }
 
 // ProcessPayment simulates a successful payment for the excess baggage fee on a
-// check-in.  It creates a Payment record and resumes the check-in.
-func (s *PaymentService) ProcessPayment(checkInID uint) (*models.Payment, error) {
+// check-in.  It validates the provided amount against the calculated excess fee,
+// creates a Payment record, and resumes the check-in to IN_PROGRESS.
+func (s *PaymentService) ProcessPayment(checkInID uint, amount float64) (*models.Payment, error) {
 	var ci models.CheckIn
 	if err := s.db.First(&ci, checkInID).Error; err != nil {
 		return nil, fmt.Errorf("check-in not found: %w", err)
@@ -42,6 +43,10 @@ func (s *PaymentService) ProcessPayment(checkInID uint) (*models.Payment, error)
 		return nil, errors.New("no excess fee to pay")
 	}
 
+	if amount < totalFee {
+		return nil, fmt.Errorf("amount %.2f is less than the excess fee owed %.2f", amount, totalFee)
+	}
+
 	payment := &models.Payment{
 		CheckInID: checkInID,
 		Amount:    totalFee,
@@ -51,9 +56,10 @@ func (s *PaymentService) ProcessPayment(checkInID uint) (*models.Payment, error)
 		return nil, fmt.Errorf("failed to record payment: %w", err)
 	}
 
-	// Resume check-in
-	if err := s.checkInSvc.CompleteCheckIn(checkInID); err != nil {
-		return payment, fmt.Errorf("payment recorded but failed to complete check-in: %w", err)
+	// Resume check-in to IN_PROGRESS so the passenger can complete the process.
+	if err := s.db.Model(&models.CheckIn{}).Where("id = ?", checkInID).
+		Update("status", models.CheckInInProgress).Error; err != nil {
+		return payment, fmt.Errorf("payment recorded but failed to resume check-in: %w", err)
 	}
 
 	return payment, nil
