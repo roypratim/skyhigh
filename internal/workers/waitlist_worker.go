@@ -22,7 +22,7 @@ func NewWaitlistWorker(db *gorm.DB, waitlistSvc *services.WaitlistService) *Wait
 	return &WaitlistWorker{
 		db:          db,
 		waitlistSvc: waitlistSvc,
-		interval:    15 * time.Second,
+		interval:    30 * time.Second,
 	}
 }
 
