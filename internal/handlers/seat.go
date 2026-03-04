@@ -81,7 +81,12 @@ func (h *SeatHandler) HoldSeat(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "seat held successfully", "seat_id": seatID, "ttl_seconds": 120})
+	c.JSON(http.StatusOK, gin.H{
+		"message":           "seat held successfully",
+		"seat_id":           seatID,
+		"passenger_id":      req.PassengerID,
+		"expires_in_seconds": 120,
+	})
 }
 
 // ConfirmSeat godoc
