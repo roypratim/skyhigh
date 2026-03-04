@@ -154,6 +154,10 @@ paths:
                   created:
                     type: integer
                     description: Number of seats created
+                  seats:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Seat'
         "400":
           $ref: '#/components/responses/BadRequest'
 

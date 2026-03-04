@@ -57,7 +57,7 @@ func (h *SeatHandler) AddSeats(c *gin.Context) {
 		}
 		created = append(created, *seat)
 	}
-	c.JSON(http.StatusCreated, gin.H{"seats": created})
+	c.JSON(http.StatusCreated, gin.H{"created": len(created), "seats": created})
 }
 
 // HoldSeat godoc
