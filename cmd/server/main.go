@@ -43,9 +43,9 @@ func main() {
 	// --- Services ---
 	baggageSvc := services.NewBaggageService(database)
 	seatSvc := services.NewSeatService(database, redisClient)
-	checkInSvc := services.NewCheckInService(database, baggageSvc, seatSvc)
-	paymentSvc := services.NewPaymentService(database, checkInSvc)
 	waitlistSvc := services.NewWaitlistService(database, seatSvc)
+	checkInSvc := services.NewCheckInService(database, baggageSvc, seatSvc, waitlistSvc)
+	paymentSvc := services.NewPaymentService(database, checkInSvc)
 
 	// --- Background workers ---
 	holdWorker := workers.NewHoldExpiryWorker(database, seatSvc, waitlistSvc)

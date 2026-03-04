@@ -38,18 +38,24 @@ func (w *WaitlistWorker) Run() {
 }
 
 func (w *WaitlistWorker) processWaitlists() {
-	// Find all flights that have both AVAILABLE seats and WAITING waitlist entries
+	// Find all flights that have AVAILABLE seats.
 	var flightIDs []uint
-	w.db.Model(&models.Seat{}).
+	if err := w.db.Model(&models.Seat{}).
 		Select("DISTINCT flight_id").
 		Where("state = ?", models.SeatAvailable).
-		Pluck("flight_id", &flightIDs)
+		Pluck("flight_id", &flightIDs).Error; err != nil {
+		log.Printf("[WaitlistWorker] error querying available seats: %v", err)
+		return
+	}
 
 	for _, flightID := range flightIDs {
 		var count int64
-		w.db.Model(&models.Waitlist{}).
+		if err := w.db.Model(&models.Waitlist{}).
 			Where("flight_id = ? AND status = ?", flightID, models.WaitlistWaiting).
-			Count(&count)
+			Count(&count).Error; err != nil {
+			log.Printf("[WaitlistWorker] error counting waitlist for flight %d: %v", flightID, err)
+			continue
+		}
 		if count > 0 {
 			if err := w.waitlistSvc.PromoteNext(flightID); err != nil {
 				log.Printf("[WaitlistWorker] error promoting for flight %d: %v", flightID, err)

@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/roypratim/skyhigh/internal/models"
 	"gorm.io/gorm"
@@ -10,14 +11,15 @@ import (
 
 // CheckInService manages the check-in lifecycle.
 type CheckInService struct {
-	db         *gorm.DB
-	baggageSvc *BaggageService
-	seatSvc    *SeatService
+	db          *gorm.DB
+	baggageSvc  *BaggageService
+	seatSvc     *SeatService
+	waitlistSvc *WaitlistService
 }
 
 // NewCheckInService creates a CheckInService.
-func NewCheckInService(db *gorm.DB, baggageSvc *BaggageService, seatSvc *SeatService) *CheckInService {
-	return &CheckInService{db: db, baggageSvc: baggageSvc, seatSvc: seatSvc}
+func NewCheckInService(db *gorm.DB, baggageSvc *BaggageService, seatSvc *SeatService, waitlistSvc *WaitlistService) *CheckInService {
+	return &CheckInService{db: db, baggageSvc: baggageSvc, seatSvc: seatSvc, waitlistSvc: waitlistSvc}
 }
 
 // StartCheckIn creates a new check-in record in IN_PROGRESS state.
@@ -81,6 +83,8 @@ func (s *CheckInService) GetCheckIn(id uint) (*models.CheckIn, error) {
 }
 
 // CancelCheckIn transitions a check-in to CANCELLED state.
+// If the check-in had a confirmed seat it is released (CONFIRMED → AVAILABLE)
+// inside a DB transaction, then waitlist promotion is triggered for the flight.
 func (s *CheckInService) CancelCheckIn(id uint) error {
 	var ci models.CheckIn
 	if err := s.db.First(&ci, id).Error; err != nil {
@@ -89,7 +93,34 @@ func (s *CheckInService) CancelCheckIn(id uint) error {
 	if ci.Status == models.CheckInCompleted || ci.Status == models.CheckInCancelled {
 		return fmt.Errorf("cannot cancel a check-in with status %s", ci.Status)
 	}
-	return s.db.Model(&ci).Update("status", models.CheckInCancelled).Error
+
+	// Update check-in status and release the seat (if any) atomically.
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&ci).Update("status", models.CheckInCancelled).Error; err != nil {
+			return err
+		}
+		if ci.SeatID != nil {
+			if err := tx.Model(&models.Seat{}).Where("id = ?", *ci.SeatID).Updates(map[string]interface{}{
+				"state":        models.SeatAvailable,
+				"passenger_id": nil,
+			}).Error; err != nil {
+				return fmt.Errorf("failed to release seat: %w", err)
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	// Trigger waitlist promotion for the freed seat, if any.
+	if ci.SeatID != nil && s.waitlistSvc != nil {
+		if err := s.waitlistSvc.PromoteNext(ci.FlightID); err != nil {
+			// Non-fatal: log but don't fail the cancellation.
+			log.Printf("warn: waitlist promotion after cancellation of check-in %d: %v\n", id, err)
+		}
+	}
+
+	return nil
 }
 
 // CompleteCheckIn marks a check-in as COMPLETED (used after payment if required).
