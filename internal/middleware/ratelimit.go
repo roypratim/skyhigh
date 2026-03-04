@@ -18,9 +18,9 @@ const (
 )
 
 // RateLimit returns a Gin middleware that detects abusive seat-map access patterns.
-// It uses a Redis sorted set per IP to count unique seat IDs accessed in a 2-second
-// sliding window.  IPs exceeding 50 unique seat maps within the window are blocked
-// for 60 seconds.
+// It uses a Redis sorted set per IP to count unique flight IDs (seat maps) accessed
+// in a 2-second sliding window.  IPs exceeding 50 unique flight seat maps within the
+// window are blocked for 60 seconds.
 func RateLimit(rdb *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
@@ -37,16 +37,16 @@ func RateLimit(rdb *redis.Client) gin.HandlerFunc {
 			return
 		}
 
-		// Only apply sliding-window tracking to seat map endpoints
-		seatIDParam := c.Param("id")
-		if seatIDParam == "" {
+		// Only apply sliding-window tracking to seat map endpoints (id = flight ID)
+		flightIDParam := c.Param("id")
+		if flightIDParam == "" {
 			c.Next()
 			return
 		}
 
 		trackKey := fmt.Sprintf("seatmap_track:%s", ip)
 		now := float64(time.Now().UnixNano())
-		member := fmt.Sprintf("%s:%d", seatIDParam, time.Now().UnixNano())
+		member := fmt.Sprintf("%s:%d", flightIDParam, time.Now().UnixNano())
 
 		// Add current access
 		rdb.ZAdd(ctx, trackKey, &redis.Z{Score: now, Member: member})
@@ -56,14 +56,14 @@ func RateLimit(rdb *redis.Client) gin.HandlerFunc {
 		// Short TTL to auto-clean the sorted set
 		rdb.Expire(ctx, trackKey, 10*time.Second)
 
-		// Count unique seat IDs in the window
+		// Count unique flight IDs (seat maps) accessed in the window
 		members, err := rdb.ZRange(ctx, trackKey, 0, -1).Result()
 		if err == nil {
-			uniqueSeats := uniqueSeatIDs(members)
-			if uniqueSeats > seatMapThreshold {
+			uniqueFlightMaps := uniqueFlightIDs(members)
+			if uniqueFlightMaps > seatMapThreshold {
 				rdb.Set(ctx, blockKey, "1", blockDuration)
-				log.Printf("[RATELIMIT] IP %s blocked: accessed %d unique seat maps in %s",
-					ip, uniqueSeats, seatMapWindow)
+				log.Printf("[RATELIMIT] IP %s blocked: accessed %d unique flight seat maps in %s",
+					ip, uniqueFlightMaps, seatMapWindow)
 				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 					"error": "abuse detected – your IP has been temporarily blocked",
 				})
@@ -75,9 +75,9 @@ func RateLimit(rdb *redis.Client) gin.HandlerFunc {
 	}
 }
 
-// uniqueSeatIDs counts how many distinct seat IDs appear in the sorted set members.
-// Members are formatted as "{seatID}:{timestamp}".
-func uniqueSeatIDs(members []string) int {
+// uniqueFlightIDs counts how many distinct flight IDs appear in the sorted set members.
+// Members are formatted as "{flightID}:{timestamp}".
+func uniqueFlightIDs(members []string) int {
 	seen := make(map[string]struct{}, len(members))
 	for _, m := range members {
 		for i := len(m) - 1; i >= 0; i-- {
