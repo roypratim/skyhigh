@@ -2,8 +2,6 @@ module github.com/roypratim/skyhigh
 
 go 1.23
 
-toolchain go1.24.13
-
 require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-redis/redis/v8 v8.11.5
