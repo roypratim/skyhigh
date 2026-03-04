@@ -196,9 +196,7 @@ paths:
                     example: "seat held for 120 seconds"
                   seat_id:
                     type: integer
-                  passenger_id:
-                    type: integer
-                  expires_in_seconds:
+                  ttl_seconds:
                     type: integer
                     example: 120
         "404":
