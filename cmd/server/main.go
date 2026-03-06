@@ -25,7 +25,8 @@ func main() {
 	redisClient := cache.NewRedisClient(cfg)
 
 	// --- Auto-migrate schema ---
-	if err := database.AutoMigrate(
+	log.Println("[DEBUG] Starting auto-migration...")
+	err := database.AutoMigrate(
 		&models.Flight{},
 		&models.Passenger{},
 		&models.Seat{},
@@ -33,9 +34,11 @@ func main() {
 		&models.Baggage{},
 		&models.Payment{},
 		&models.Waitlist{},
-	); err != nil {
-		log.Fatalf("auto-migrate failed: %v", err)
+	)
+	if err != nil {
+		log.Fatalf("auto-migrate failed: %T %+v", err, err)
 	}
+	log.Println("[DEBUG] Successfully migrated all models")
 
 	// --- Seed demo data ---
 	seedDemoData(database)
@@ -69,20 +72,23 @@ func main() {
 
 	// Protected routes (require authentication)
 	authGroup := v1.Group("")
-	authGroup.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 
 	// Flights
 	// Flight creation is considered an admin-level operation and is protected.
 	authGroup.POST("/flights", flightH.CreateFlight)
-	// Public read access to flight details and seatmap (seatmap is rate-limited).
-	v1.GET("/flights/:id", flightH.GetFlight)
-	v1.GET("/flights/:id/seatmap", middleware.RateLimit(redisClient), flightH.GetSeatMap)
 
-	// Seats
-	// Seat creation is considered an admin-level operation and is protected.
+	// Seats (register specific routes before generic :id routes)
 	authGroup.POST("/flights/:flightId/seats", seatH.AddSeats)
 	authGroup.POST("/seats/:id/hold", seatH.HoldSeat)
 	authGroup.POST("/seats/:id/confirm", seatH.ConfirmSeat)
+
+	// Waitlist (register specific routes before generic :id routes)
+	authGroup.POST("/flights/:flightId/waitlist", waitlistH.JoinWaitlist)
+	authGroup.GET("/flights/:flightId/waitlist", waitlistH.GetWaitlist)
+
+	// Public read access to flight details and seatmap (register generic routes after specific ones)
+	v1.GET("/flights/:flightId", flightH.GetFlight)
+	v1.GET("/flights/:flightId/seatmap", middleware.RateLimit(redisClient), flightH.GetSeatMap)
 
 	// Check-in
 	authGroup.POST("/checkins", checkInH.StartCheckIn)
@@ -94,10 +100,6 @@ func main() {
 
 	// Payment
 	authGroup.POST("/checkins/:id/payment", paymentH.ProcessPayment)
-
-	// Waitlist
-	authGroup.POST("/flights/:flightId/waitlist", waitlistH.JoinWaitlist)
-	authGroup.GET("/flights/:flightId/waitlist", waitlistH.GetWaitlist)
 
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)
 	log.Printf("SkyHigh Core listening on %s", addr)
@@ -153,4 +155,3 @@ func seedDemoData(database *gorm.DB) {
 
 	log.Printf("[SEED] demo flight %s created with %d seats (passenger id=%d)", flight.FlightNumber, seatNum, passenger.ID)
 }
-

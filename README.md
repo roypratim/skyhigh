@@ -58,7 +58,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_USER=skyhigh
 DB_PASSWORD=skyhigh123
-DB_NAME=skyhigh_db
+DB_NAME=skyhigh
 REDIS_HOST=localhost
 REDIS_PORT=6379
 SERVER_PORT=8080
@@ -174,6 +174,9 @@ curl -X POST http://localhost:8080/api/v1/checkins/1/payment \
 | [`WORKFLOW_DESIGN.md`](WORKFLOW_DESIGN.md) | Flow diagrams and database schema |
 | [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md) | Codebase structure explained |
 | [`API-SPECIFICATION.yml`](API-SPECIFICATION.yml) | OpenAPI 3.0 specification |
+| [`SkyHigh_API_Collection.postman_collection.json`](SkyHigh_API_Collection.postman_collection.json) | Postman collection for API testing |
+| [`SkyHigh_Local_Environment.postman_environment.json`](SkyHigh_Local_Environment.postman_environment.json) | Postman environment for local development |
+| [`POSTMAN_README.md`](POSTMAN_README.md) | Postman collection usage guide |
 | [`CHAT_HISTORY.md`](CHAT_HISTORY.md) | Design decisions and AI collaboration log |
 
 ---

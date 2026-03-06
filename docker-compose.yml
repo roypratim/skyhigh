@@ -1,7 +1,7 @@
-version: '3.8'
 services:
   app:
     build: .
+    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
@@ -10,10 +10,10 @@ services:
       - DB_PORT=5432
       - DB_USER=skyhigh
       - DB_PASSWORD=skyhigh123
-      - DB_NAME=skyhigh_db
+      - DB_NAME=skyhigh
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - JWT_SECRET=skyhigh-secret-key
+      # - JWT_SECRET=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsb2NhbC1kZXYtdXNlciIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc3MjgxNTA4NywiZXhwIjoxNzcyOTAxNDg3fQ.4dckh9CJCPeiH6MEJJx_CcquKyXw18tgYgVCX4A1sbM
     depends_on:
       postgres:
         condition: service_healthy
@@ -22,10 +22,11 @@ services:
 
   postgres:
     image: postgres:15-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: skyhigh
       POSTGRES_PASSWORD: skyhigh123
-      POSTGRES_DB: skyhigh_db
+      POSTGRES_DB: skyhigh
     ports:
       - "5432:5432"
     volumes:
@@ -38,6 +39,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - "6379:6379"
     healthcheck:

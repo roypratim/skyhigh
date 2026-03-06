@@ -14,12 +14,12 @@ const (
 // Waitlist tracks passengers waiting for a seat on a flight.
 type Waitlist struct {
 	ID          uint           `gorm:"primaryKey" json:"id"`
-	FlightID    uint           `gorm:"not null;index" json:"flight_id"`
+	FlightID    uint           `gorm:"index" json:"flight_id"`
 	Flight      *Flight        `gorm:"foreignKey:FlightID" json:"flight,omitempty"`
-	PassengerID uint           `gorm:"not null;index" json:"passenger_id"`
+	PassengerID uint           `gorm:"index" json:"passenger_id"`
 	Passenger   *Passenger     `gorm:"foreignKey:PassengerID" json:"passenger,omitempty"`
-	Position    int            `gorm:"not null" json:"position"`
-	Status      WaitlistStatus `gorm:"size:20;default:WAITING" json:"status"`
+	Position    int            `json:"position"`
+	Status      WaitlistStatus `json:"status"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 }

@@ -12,7 +12,7 @@ import (
 // Connect opens a PostgreSQL connection and returns a *gorm.DB instance.
 func Connect(cfg *config.Config) *gorm.DB {
 	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
+		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)

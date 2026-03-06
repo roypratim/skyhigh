@@ -52,9 +52,10 @@ func (h *FlightHandler) CreateFlight(c *gin.Context) {
 }
 
 // GetFlight godoc
-// GET /api/v1/flights/:id
+// GET /api/v1/flights/:flightId
 func (h *FlightHandler) GetFlight(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	idStr := c.Param("flightId")
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid flight id"})
 		return
@@ -62,18 +63,23 @@ func (h *FlightHandler) GetFlight(c *gin.Context) {
 
 	var flight models.Flight
 	if err := h.db.First(&flight, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "flight not found"})
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "flight not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	c.JSON(http.StatusOK, flight)
 }
 
 // GetSeatMap godoc
-// GET /api/v1/flights/:id/seatmap
+// GET /api/v1/flights/:flightId/seatmap
 // Results are cached in Redis for 30 seconds.
 func (h *FlightHandler) GetSeatMap(c *gin.Context) {
-	id := c.Param("id")
-	cacheKey := "seatmap:" + id
+	idStr := c.Param("flightId")
+	cacheKey := "seatmap:" + idStr
 	ctx := context.Background()
 
 	// Try cache first
@@ -85,7 +91,7 @@ func (h *FlightHandler) GetSeatMap(c *gin.Context) {
 		}
 	}
 
-	flightID, err := strconv.ParseUint(id, 10, 64)
+	flightID, err := strconv.Atoi(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid flight id"})
 		return

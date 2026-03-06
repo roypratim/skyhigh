@@ -1,0 +1,654 @@
+{
+  "info": {
+    "name": "SkyHigh Core - Digital Check-In API",
+    "description": "Postman collection for SkyHigh Airlines' digital check-in system API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "skyhigh-api"
+  },
+  "item": [
+    {
+      "name": "Flights",
+      "item": [
+        {
+          "name": "Create Flight",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "description": "JWT token for admin operations"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flight_number\": \"SH002\",\n  \"origin\": \"JFK\",\n  \"destination\": \"LHR\",\n  \"departure_time\": \"2026-06-01T14:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/flights",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "flights"
+              ]
+            },
+            "description": "Admin endpoint to create a new flight"
+          }
+        },
+        {
+          "name": "Get Flight Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/flights/{{flight_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "flights",
+                "{{flight_id}}"
+              ]
+            },
+            "description": "Get details for a specific flight"
+          }
+        },
+        {
+          "name": "Get Seat Map",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/flights/{{flight_id}}/seatmap",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "flights",
+                "{{flight_id}}",
+                "seatmap"
+              ]
+            },
+            "description": "Get the seat map for a flight (cached, rate-limited)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Seats",
+      "item": [
+        {
+          "name": "Add Seats to Flight",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "description": "JWT token for admin operations"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seats\": [\n    {\n      \"seat_number\": \"1A\",\n      \"class\": \"BUSINESS\"\n    },\n    {\n      \"seat_number\": \"1B\",\n      \"class\": \"BUSINESS\"\n    },\n    {\n      \"seat_number\": \"10A\",\n      \"class\": \"ECONOMY\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/flights/{{flight_id}}/seats",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "flights",
+                "{{flight_id}}",
+                "seats"
+              ]
+            },
+            "description": "Admin endpoint to add seats to a flight"
+          }
+        },
+        {
+          "name": "Hold Seat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passenger_id\": {{passenger_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/seats/{{seat_id}}/hold",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "seats",
+                "{{seat_id}}",
+                "hold"
+              ]
+            },
+            "description": "Hold a seat for 120 seconds"
+          }
+        },
+        {
+          "name": "Confirm Seat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passenger_id\": {{passenger_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/seats/{{seat_id}}/confirm",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "seats",
+                "{{seat_id}}",
+                "confirm"
+              ]
+            },
+            "description": "Confirm a held seat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Check-ins",
+      "item": [
+        {
+          "name": "Start Check-in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passenger_id\": {{passenger_id}},\n  \"flight_id\": {{flight_id}},\n  \"seat_id\": {{seat_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/checkins",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkins"
+              ]
+            },
+            "description": "Start a check-in process"
+          }
+        },
+        {
+          "name": "Get Check-in Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/checkins/{{checkin_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkins",
+                "{{checkin_id}}"
+              ]
+            },
+            "description": "Get the status of a check-in"
+          }
+        },
+        {
+          "name": "Cancel Check-in",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/checkins/{{checkin_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkins",
+                "{{checkin_id}}"
+              ]
+            },
+            "description": "Cancel a check-in and release the seat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Baggage",
+      "item": [
+        {
+          "name": "Add Baggage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weight_kg\": 20.5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/checkins/{{checkin_id}}/baggage",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkins",
+                "{{checkin_id}}",
+                "baggage"
+              ]
+            },
+            "description": "Add baggage to a check-in (25kg limit, $15/kg excess fee)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment",
+      "item": [
+        {
+          "name": "Process Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 45.00\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/checkins/{{checkin_id}}/payment",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkins",
+                "{{checkin_id}}",
+                "payment"
+              ]
+            },
+            "description": "Process payment for excess baggage fees"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Waitlist",
+      "item": [
+        {
+          "name": "Join Waitlist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passenger_id\": {{passenger_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/flights/{{flight_id}}/waitlist",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "flights",
+                "{{flight_id}}",
+                "waitlist"
+              ]
+            },
+            "description": "Join the waitlist for a flight"
+          }
+        },
+        {
+          "name": "Get Waitlist",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/flights/{{flight_id}}/waitlist",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "flights",
+                "{{flight_id}}",
+                "waitlist"
+              ]
+            },
+            "description": "View the current waitlist for a flight"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Example Flows",
+      "item": [
+        {
+          "name": "Complete Check-in Flow",
+          "item": [
+            {
+              "name": "1. Get Seat Map",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/flights/1/seatmap",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "flights",
+                    "1",
+                    "seatmap"
+                  ]
+                },
+                "description": "Get the seat map for flight 1"
+              }
+            },
+            {
+              "name": "2. Hold Seat",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"passenger_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/seats/3/hold",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "seats",
+                    "3",
+                    "hold"
+                  ]
+                },
+                "description": "Hold seat 3 for passenger 1"
+              }
+            },
+            {
+              "name": "3. Start Check-in",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"passenger_id\": 1,\n  \"flight_id\": 1,\n  \"seat_id\": 3\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/checkins",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "checkins"
+                  ]
+                },
+                "description": "Start check-in process"
+              }
+            },
+            {
+              "name": "4. Add Baggage (Within Limit)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"weight_kg\": 20\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/checkins/1/baggage",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "checkins",
+                    "1",
+                    "baggage"
+                  ]
+                },
+                "description": "Add baggage within the 25kg limit"
+              }
+            },
+            {
+              "name": "5. Add Excess Baggage",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"weight_kg\": 8\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/checkins/1/baggage",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "checkins",
+                    "1",
+                    "baggage"
+                  ]
+                },
+                "description": "Add excess baggage that triggers payment requirement"
+              }
+            },
+            {
+              "name": "6. Process Payment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"amount\": 45.00\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/checkins/1/payment",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "checkins",
+                    "1",
+                    "payment"
+                  ]
+                },
+                "description": "Process payment for excess baggage fee"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set default values for variables if not set",
+          "if (!pm.environment.get('base_url')) {",
+          "    pm.environment.set('base_url', 'http://localhost:8080/api/v1');",
+          "}",
+          "",
+          "if (!pm.environment.get('flight_id')) {",
+          "    pm.environment.set('flight_id', '1');",
+          "}",
+          "",
+          "if (!pm.environment.get('passenger_id')) {",
+          "    pm.environment.set('passenger_id', '1');",
+          "}",
+          "",
+          "if (!pm.environment.get('seat_id')) {",
+          "    pm.environment.set('seat_id', '3');",
+          "}",
+          "",
+          "if (!pm.environment.get('checkin_id')) {",
+          "    pm.environment.set('checkin_id', '1');",
+          "}",
+          "",
+          "if (!pm.environment.get('jwt_token')) {",
+          "    pm.environment.set('jwt_token', 'your-jwt-token-here');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "flight_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "passenger_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "seat_id",
+      "value": "3",
+      "type": "string"
+    },
+    {
+      "key": "checkin_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "your-jwt-token-here",
+      "type": "string"
+    }
+  ]
+}
