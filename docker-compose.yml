@@ -1,0 +1,50 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=skyhigh
+      - DB_PASSWORD=skyhigh123
+      - DB_NAME=skyhigh_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=skyhigh-secret-key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: skyhigh
+      POSTGRES_PASSWORD: skyhigh123
+      POSTGRES_DB: skyhigh_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skyhigh"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

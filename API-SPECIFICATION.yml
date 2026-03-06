@@ -1,0 +1,682 @@
+openapi: "3.0.3"
+info:
+  title: SkyHigh Core – Digital Check-In API
+  description: |
+    Backend API for SkyHigh Airlines' digital self-check-in system.
+    Handles seat selection, time-bound holds, baggage validation,
+    payment processing, waitlist management, and abuse detection.
+  version: "1.0.0"
+  contact:
+    name: SkyHigh Engineering
+    email: engineering@skyhigh.io
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+  - url: https://api.skyhigh.io/v1
+    description: Production server
+
+tags:
+  - name: flights
+    description: Flight management and seat map
+  - name: seats
+    description: Seat hold and confirmation
+  - name: checkins
+    description: Check-in lifecycle
+  - name: baggage
+    description: Baggage validation and fees
+  - name: payments
+    description: Payment processing (simulated)
+  - name: waitlist
+    description: Waitlist management
+
+paths:
+
+  # ─────────────────────────────────────────
+  # FLIGHTS
+  # ─────────────────────────────────────────
+
+  /flights:
+    post:
+      tags: [flights]
+      summary: Create a flight
+      description: Admin endpoint to create a new flight.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFlightRequest'
+            example:
+              flight_number: "SH002"
+              origin: "JFK"
+              destination: "LHR"
+              departure_time: "2026-06-01T14:00:00Z"
+      responses:
+        "201":
+          description: Flight created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flight'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  /flights/{id}:
+    get:
+      tags: [flights]
+      summary: Get flight details
+      parameters:
+        - $ref: '#/components/parameters/FlightId'
+      responses:
+        "200":
+          description: Flight details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flight'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /flights/{id}/seatmap:
+    get:
+      tags: [flights]
+      summary: Get seat map for a flight
+      description: |
+        Returns all seats and their current states for the given flight.
+        Response is cached in Redis for 30 seconds.
+        Rate-limited: IPs accessing >50 unique seat maps within 2 seconds
+        are blocked for 60 seconds (HTTP 429).
+      parameters:
+        - $ref: '#/components/parameters/FlightId'
+      responses:
+        "200":
+          description: Seat map
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  flight_id:
+                    type: integer
+                  seats:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Seat'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "429":
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ─────────────────────────────────────────
+  # SEATS
+  # ─────────────────────────────────────────
+
+  /flights/{flightId}/seats:
+    post:
+      tags: [seats]
+      summary: Add seats to a flight
+      description: Admin endpoint to add one or more seats to a flight.
+      parameters:
+        - name: flightId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [seats]
+              properties:
+                seats:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/CreateSeatRequest'
+            example:
+              seats:
+                - seat_number: "1A"
+                  class: "BUSINESS"
+                - seat_number: "1B"
+                  class: "BUSINESS"
+                - seat_number: "10A"
+                  class: "ECONOMY"
+      responses:
+        "201":
+          description: Seats created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created:
+                    type: integer
+                    description: Number of seats created
+                  seats:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Seat'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  /seats/{id}/hold:
+    post:
+      tags: [seats]
+      summary: Hold a seat (2-minute TTL)
+      description: |
+        Temporarily reserves a seat for a passenger for exactly 120 seconds.
+        Uses a Redis distributed lock to guarantee exactly-once assignment.
+        Returns 409 if the seat is not AVAILABLE.
+      parameters:
+        - $ref: '#/components/parameters/SeatId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passenger_id]
+              properties:
+                passenger_id:
+                  type: integer
+            example:
+              passenger_id: 1
+      responses:
+        "200":
+          description: Seat held successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "seat held for 120 seconds"
+                  seat_id:
+                    type: integer
+                  ttl_seconds:
+                    type: integer
+                    example: 120
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          description: Seat is not available (already HELD or CONFIRMED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /seats/{id}/confirm:
+    post:
+      tags: [seats]
+      summary: Confirm a held seat
+      description: |
+        Transitions a seat from HELD → CONFIRMED for the holding passenger.
+        Fails if the hold has expired or the seat is held by a different passenger.
+      parameters:
+        - $ref: '#/components/parameters/SeatId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passenger_id]
+              properties:
+                passenger_id:
+                  type: integer
+            example:
+              passenger_id: 1
+      responses:
+        "200":
+          description: Seat confirmed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "seat confirmed"
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          description: Hold expired or owned by another passenger
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ─────────────────────────────────────────
+  # CHECK-IN
+  # ─────────────────────────────────────────
+
+  /checkins:
+    post:
+      tags: [checkins]
+      summary: Start a check-in
+      description: |
+        Creates a check-in record, confirms the seat, and sets status to IN_PROGRESS.
+        The target seat must already be in HELD state for this passenger.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCheckInRequest'
+            example:
+              passenger_id: 1
+              flight_id: 1
+              seat_id: 5
+      responses:
+        "201":
+          description: Check-in started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckIn'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "409":
+          description: Seat conflict or duplicate check-in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /checkins/{id}:
+    get:
+      tags: [checkins]
+      summary: Get check-in status
+      parameters:
+        - $ref: '#/components/parameters/CheckInId'
+      responses:
+        "200":
+          description: Check-in details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckIn'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [checkins]
+      summary: Cancel a check-in
+      description: |
+        Cancels the check-in, releases the associated seat (CONFIRMED → AVAILABLE),
+        and automatically promotes the next waitlisted passenger if applicable.
+      parameters:
+        - $ref: '#/components/parameters/CheckInId'
+      responses:
+        "200":
+          description: Check-in cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "check-in cancelled"
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          description: Check-in already cancelled or completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ─────────────────────────────────────────
+  # BAGGAGE
+  # ─────────────────────────────────────────
+
+  /checkins/{id}/baggage:
+    post:
+      tags: [baggage]
+      summary: Add baggage to a check-in
+      description: |
+        Adds a baggage item to the check-in. If total weight across all bags
+        exceeds 25 kg, the check-in is paused (status → WAITING_PAYMENT) and
+        an excess fee of $15/kg is charged.
+      parameters:
+        - $ref: '#/components/parameters/CheckInId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [weight_kg]
+              properties:
+                weight_kg:
+                  type: number
+                  format: float
+                  minimum: 0.1
+            example:
+              weight_kg: 28.5
+      responses:
+        "200":
+          description: Baggage added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  baggage_id:
+                    type: integer
+                  weight_kg:
+                    type: number
+                  excess_fee:
+                    type: number
+                    description: Dollar amount owed (0 if within limit)
+                  check_in_status:
+                    type: string
+                    enum: [IN_PROGRESS, WAITING_PAYMENT]
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────
+  # PAYMENT
+  # ─────────────────────────────────────────
+
+  /checkins/{id}/payment:
+    post:
+      tags: [payments]
+      summary: Process payment for excess baggage
+      description: |
+        Simulates a payment for the excess baggage fee.
+        On success, the check-in status returns to IN_PROGRESS
+        so the passenger can complete check-in.
+      parameters:
+        - $ref: '#/components/parameters/CheckInId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: number
+                  format: float
+                  description: Payment amount in USD
+            example:
+              amount: 52.50
+      responses:
+        "200":
+          description: Payment confirmed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "payment confirmed"
+                  check_in_status:
+                    type: string
+                    example: "IN_PROGRESS"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────
+  # WAITLIST
+  # ─────────────────────────────────────────
+
+  /flights/{flightId}/waitlist:
+    post:
+      tags: [waitlist]
+      summary: Join the waitlist for a flight
+      description: |
+        Adds a passenger to the waitlist queue for a flight.
+        Position is assigned based on time of request.
+        Passengers are automatically notified (logged) when a seat becomes available.
+      parameters:
+        - name: flightId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passenger_id]
+              properties:
+                passenger_id:
+                  type: integer
+            example:
+              passenger_id: 7
+      responses:
+        "201":
+          description: Joined waitlist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaitlistEntry'
+        "409":
+          description: Passenger already on waitlist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [waitlist]
+      summary: Get the waitlist for a flight
+      parameters:
+        - name: flightId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Waitlist entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WaitlistEntry'
+
+# ─────────────────────────────────────────────────────
+# COMPONENTS
+# ─────────────────────────────────────────────────────
+components:
+
+  parameters:
+    FlightId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Flight ID
+
+    SeatId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Seat ID
+
+    CheckInId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Check-In ID
+
+  responses:
+    BadRequest:
+      description: Invalid request body
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    TooManyRequests:
+      description: Rate limit exceeded – IP temporarily blocked
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "abuse detected – your IP has been temporarily blocked"
+
+  schemas:
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+    Flight:
+      type: object
+      properties:
+        id:
+          type: integer
+        flight_number:
+          type: string
+          example: "SH001"
+        origin:
+          type: string
+          example: "JFK"
+        destination:
+          type: string
+          example: "LAX"
+        departure_time:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateFlightRequest:
+      type: object
+      required: [flight_number, origin, destination, departure_time]
+      properties:
+        flight_number:
+          type: string
+        origin:
+          type: string
+        destination:
+          type: string
+        departure_time:
+          type: string
+          format: date-time
+
+    Seat:
+      type: object
+      properties:
+        id:
+          type: integer
+        flight_id:
+          type: integer
+        seat_number:
+          type: string
+          example: "3B"
+        class:
+          type: string
+          enum: [ECONOMY, BUSINESS, FIRST]
+        state:
+          type: string
+          enum: [AVAILABLE, HELD, CONFIRMED, CANCELLED]
+        passenger_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateSeatRequest:
+      type: object
+      required: [seat_number]
+      properties:
+        seat_number:
+          type: string
+        class:
+          type: string
+          enum: [ECONOMY, BUSINESS, FIRST]
+          default: ECONOMY
+
+    CheckIn:
+      type: object
+      properties:
+        id:
+          type: integer
+        passenger_id:
+          type: integer
+        flight_id:
+          type: integer
+        seat_id:
+          type: integer
+        status:
+          type: string
+          enum: [IN_PROGRESS, WAITING_PAYMENT, COMPLETED, CANCELLED]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateCheckInRequest:
+      type: object
+      required: [passenger_id, flight_id, seat_id]
+      properties:
+        passenger_id:
+          type: integer
+        flight_id:
+          type: integer
+        seat_id:
+          type: integer
+
+    WaitlistEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        flight_id:
+          type: integer
+        passenger_id:
+          type: integer
+        position:
+          type: integer
+        status:
+          type: string
+          enum: [WAITING, ASSIGNED, CANCELLED]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
